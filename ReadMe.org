@@ -1,0 +1,7 @@
+#+TITLE: Japanese For Me
+
+My tailor-made suite for studying Japanese.
+
+* Setup
+- [[https://foosoft.net/projects/anki-connect/index.html#installation][Install AnkiConnect]]
+- Run Anki

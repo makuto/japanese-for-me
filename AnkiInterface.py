@@ -24,6 +24,8 @@ argParser.add_argument('--only-warnings', action='store_const', const=True, defa
                        help='Only output warnings and errors. It is recommended to do this in conjuction '
                        'with --soft-edit to spot problems before running the script')
 
+# See AnkiConnect docs for available options:
+# https://foosoft.net/projects/anki-connect/
 def formatAnkiConnectRequest(action, **params):
     return {'action': action, 'params': params, 'version': 6}
 
@@ -52,10 +54,21 @@ def sanitizeTextForConversion(fieldValue):
     # These confuse romkan, and aren't usually a part of the language anyhow
     return fieldValue.replace('-', '').replace('’', ' ')
 
+def getDueNotes(deckName):
+    cardsDue = invokeAnkiConnect('findCards', query='"deck:{}" is:due'.format(deckName))
+    if not cardsDue:
+        print("No cards due in deck '{}'".format(deckName))
+        return []
+    print("{} cards due in deck '{}'".format(len(cardsDue), deckName))
+    return invokeAnkiConnect('cardsToNotes', cards = cardsDue)
+
 def testConnection(deckName, fieldToConvert, conversionHintField=None,
                    shouldEdit=True):
-    pass
-
+    notes = getDueNotes(deckName)
+    notesInfo = invokeAnkiConnect('notesInfo', notes = notes)
+ 
+    for note in notesInfo:
+        print(note['fields'])
 # def convertNotes(deckName, fieldToConvert, conversionHintField=None,
 #                  shouldEdit=True):
 #     notes = getNotes(deckName)

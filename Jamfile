@@ -1,0 +1,4 @@
+SubDir . ;
+
+Main japanese_for_me : src/Main.cpp
+;

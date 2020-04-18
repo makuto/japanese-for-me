@@ -104,6 +104,14 @@ void listDecks()
 		std::cout << "[" << i << "] " << resultValue[i].GetString() << "\n";
 }
 
+void syncAnkiToAnkiWeb()
+{
+	const char* jsonRequest = "{\"action\": \"sync\", \"version\": 6}";
+	std::string result = ankiConnectRequest(curl_handle, jsonRequest);
+	// if (result.empty())
+		// return;
+}
+
 void getDueCards(rapidjson::Document& jsonResult)
 {
 	// Build the request
@@ -245,6 +253,9 @@ int main()
 
 	curl_global_init(CURL_GLOBAL_ALL);
 	curl_handle = curl_easy_init();
+
+	// Make sure we are working with up-to-date data
+	syncAnkiToAnkiWeb();
 
 	// listDecks();
 	rapidjson::Document dueCardIds;

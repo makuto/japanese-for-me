@@ -3,5 +3,34 @@
 My tailor-made suite for studying Japanese.
 
 * Setup
+** Clone Repository
+Download submodules as well:
+
+#+BEGIN_SRC sh
+git clone --recurse-submodules https://github.com/makuto/japanese-for-me
+#+END_SRC
+** Install Dependencies
+Jam is used to build Japanese for Me. You will need a C++ toolchain (clang or gcc) installed as well.
+
+#+BEGIN_SRC sh
+sudo apt install jam
+#+END_SRC
+** Prepare Anki
+Anki is used to manage spaced repitition.
+
 - [[https://foosoft.net/projects/anki-connect/index.html#installation][Install AnkiConnect]]
 - Run Anki
+** Building
+Build CURL:
+#+BEGIN_SRC sh
+./BuildDependencies_Debug.sh
+#+END_SRC
+
+Build Japanese for Me:
+#+BEGIN_SRC sh
+./Build_Debug.sh
+#+END_SRC
+* License
+The repository itself is under the MIT license.
+
+Tatoeba corpus licensing details are available [[https://tatoeba.org/eng/terms_of_use#section-6][here]]. They vary per-sentence in license, so I will assume attribution is required per-sentence (which is the most restrictive license they have).

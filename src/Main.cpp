@@ -1,5 +1,8 @@
 #include <assert.h>
 #include <string.h>
+#include <algorithm>
+#include <chrono>
+#include <ctime>
 #include <iostream>
 #include <sstream>
 
@@ -9,10 +12,22 @@
 
 static const char* ankiConnectURL = "http://localhost:8765";
 
+// Assumptions made
+// - Anki is running, with the AnkiConnect plugin installed and enabled
+// - Simple cards have "Front" and "Back" fields
+// - Advanced cards use field "Lemma" for the thing in the language you're learning and "English
+//   Gloss" for the first language field
+
+// 7PM is when I want to be done studying to focus on winding down
+int hourStudyTimeEnds = 7 + 12;
+
 CURL* curl_handle = nullptr;
 bool curlVerbose = false;
+bool curlRequestVerbose = false;
+bool curlResponseStats = false;
+bool curlResponseVerbose = false;
 
-// I hate auto
+// I hate auto, so I made this instead
 typedef rapidjson::GenericObject<
     true, rapidjson::GenericValue<rapidjson::UTF8<char>,
                                   rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator>>>
@@ -30,7 +45,8 @@ std::string ankiConnectRequest(CURL* curl_handle, const char* jsonRequest)
 {
 	std::string receivedString = "";
 
-	std::cout << "Request: '" << jsonRequest << "'\n";
+	if (curlRequestVerbose)
+		std::cout << "Request: '" << jsonRequest << "'\n";
 
 	curl_easy_setopt(curl_handle, CURLOPT_URL, ankiConnectURL);
 	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, CurlReceive);
@@ -56,11 +72,14 @@ std::string ankiConnectRequest(CURL* curl_handle, const char* jsonRequest)
 	{
 		char* contentType;
 		resultCode = curl_easy_getinfo(curl_handle, CURLINFO_CONTENT_TYPE, &contentType);
-		if (resultCode == CURLE_OK && contentType)
+		if (curlResponseStats && resultCode == CURLE_OK && contentType)
+		{
 			std::cout << "Received type " << contentType << "\n";
+			std::cout << receivedString.size() << " characters received\n";
+		}
 
-		std::cout << receivedString.size() << " characters received\n";
-		// std::cout << receivedString << "\n";
+		if (curlResponseVerbose)
+			std::cout << receivedString << "\n";
 	}
 	else
 	{
@@ -84,7 +103,7 @@ void listDecks()
 		std::cout << "[" << i << "] " << resultValue[i].GetString() << "\n";
 }
 
-void listDueCards(rapidjson::Document& jsonResult)
+void getDueCards(rapidjson::Document& jsonResult)
 {
 	// Build the request
 	rapidjson::StringBuffer jsonString;
@@ -111,10 +130,11 @@ void listDueCards(rapidjson::Document& jsonResult)
 	if (result.empty())
 		return;
 	jsonResult.Parse(result.c_str());
-	const rapidjson::Value& resultValue = jsonResult["result"];
-	assert(resultValue.IsArray());
-	for (rapidjson::SizeType i = 0; i < resultValue.Size(); ++i)
-		std::cout << "[" << i << "] " << resultValue[i].GetInt64() << "\n";
+
+	// const rapidjson::Value& resultValue = jsonResult["result"];
+	// assert(resultValue.IsArray());
+	// for (rapidjson::SizeType i = 0; i < resultValue.Size(); ++i)
+	// 	std::cout << "[" << i << "] " << resultValue[i].GetInt64() << "\n";
 }
 
 void getCardInfo(rapidjson::Document& jsonResult, const rapidjson::Value& cardsIds)
@@ -159,16 +179,67 @@ void printObjectMembers(const rapidjson::Value& objectValue)
 	}
 }
 
+void listDueCardsInfo(const rapidjson::Value& dueCardsInfo)
+{
+	assert(dueCardsInfo.IsArray());
+
+	for (rapidjson::SizeType i = 0; i < dueCardsInfo.Size(); ++i)
+	{
+		const RapidJsonObject& currentCard = dueCardsInfo[i].GetObject();
+		int fieldOrder = currentCard["fieldOrder"].GetInt();
+
+		// Get quiz word
+		assert(currentCard["fields"].IsObject());
+		const rapidjson::Value& fieldsValue = currentCard["fields"];
+		assert(fieldsValue.IsObject());
+		std::string quizWord = "";
+		// Only "A Frequency Dictionary of Japanese Words" has this
+		if (fieldsValue.HasMember("Lemma"))
+		{
+			if (fieldOrder == 1)
+			{
+				// English -> Japanese
+				quizWord = fieldsValue["English Gloss"]["value"].GetString();
+			}
+			else
+			{
+				// Japanese -> English
+				quizWord = fieldsValue["Lemma"]["value"].GetString();
+			}
+		}
+		else if (fieldsValue.HasMember("Front"))
+		{
+			if (fieldOrder == 1)
+				quizWord = fieldsValue["Front"]["value"].GetString();
+			else
+				quizWord = fieldsValue["Back"]["value"].GetString();
+		}
+		else
+		{
+			std::cerr << "Card has unrecognized fields\n";
+		}
+
+		std::cout << "[" << i << "] " << currentCard["note"].GetInt64() << "\n"
+		          << "\tField order: " << fieldOrder << "\n"
+		          << "\tModel: " << currentCard["modelName"].GetString() << "\n"
+		          << "\tInterval: " << currentCard["interval"].GetInt64() << "\n"
+		          << "\tQuiz word: " << quizWord << "\n"
+		          << "\n\n";
+	}
+}
+
 int main()
 {
-	std::cout << "Japanese For Me\n";
+	std::cout << "Japanese For Me\nA vocabulary learning app by Macoy Madson.\n\n";
+
+	std::chrono::steady_clock::time_point programStartTime = std::chrono::steady_clock::now();
 
 	curl_global_init(CURL_GLOBAL_ALL);
 	curl_handle = curl_easy_init();
 
-	listDecks();
+	// listDecks();
 	rapidjson::Document dueCardIds;
-	listDueCards(dueCardIds);
+	getDueCards(dueCardIds);
 	if (dueCardIds.HasMember("result"))
 	{
 		rapidjson::Document dueCards;
@@ -176,57 +247,52 @@ int main()
 
 		assert(dueCards.HasMember("result"));
 		const rapidjson::Value& resultValue = dueCards["result"];
-		assert(resultValue.IsArray());
-		for (rapidjson::SizeType i = 0; i < resultValue.Size(); ++i)
-		{
-			const RapidJsonObject& currentCard = resultValue[i].GetObject();
-			int fieldOrder = currentCard["fieldOrder"].GetInt();
+		// listDueCardsInfo(resultValue);
 
-			// Get quiz word
-			assert(currentCard["fields"].IsObject());
-			const rapidjson::Value& fieldsValue = currentCard["fields"];
-			assert(fieldsValue.IsObject());
-			std::string quizWord = "";
-			// Only "A Frequency Dictionary of Japanese Words" has this
-			if (fieldsValue.HasMember("Lemma"))
+		int numCards = static_cast<int>(resultValue.Size());
+		if (numCards)
+		{
+			// programStartTime
+			// std::chrono::duration<float> availableStudyTime =
+			//     std::chrono::duration_cast<std::chrono::duration<float>>(endOfStudyDay -
+			//                                                               programStartTime);
+
+			// std::cout << availableStudyTime.count() << " seconds available to study\n";
+
+			// The time math is gonna be a bit loosey goosey here, but that's fine in our case
+			std::time_t currentTime;
+			std::tm* currentTimeInfo;
+			std::time(&currentTime);
+			currentTimeInfo = std::localtime(&currentTime);
+			// -1 from hours to count for minutes eating into the hour
+			float hoursTimeLeft = (((hourStudyTimeEnds - currentTimeInfo->tm_hour - 1) * 60) +
+			                       (60 - currentTimeInfo->tm_min)) /
+			                      60.f;
+			float secondsTimeLeft = (hoursTimeLeft * 60.f * 60.f);
+
+			if (secondsTimeLeft)
 			{
-				if (fieldOrder == 1)
-				{
-					// English -> Japanese
-					quizWord = fieldsValue["English Gloss"]["value"].GetString();
-				}
-				else
-				{
-					// Japanese -> English
-					quizWord = fieldsValue["Lemma"]["value"].GetString();
-				}
-			}
-			else if (fieldsValue.HasMember("Front"))
-			{
-				if (fieldOrder == 1)
-					quizWord = fieldsValue["Front"]["value"].GetString();
-				else
-					quizWord = fieldsValue["Back"]["value"].GetString();
+				std::cout << "Currently "
+				          << (currentTimeInfo->tm_hour > 12 ? currentTimeInfo->tm_hour - 12 :
+				                                              currentTimeInfo->tm_hour)
+				          << ":" << (currentTimeInfo->tm_min < 10 ? "0" : "")
+				          << currentTimeInfo->tm_min << ", " << hoursTimeLeft
+				          << " hours left to study " << numCards << " cards\n\n";
+
+				std::cout << "100% accuracy:\n\t";
+				std::cout << (secondsTimeLeft / numCards) << " seconds per card, "
+				          << std::min(numCards / hoursTimeLeft, static_cast<float>(numCards))
+				          << " cards per hour\n\n";
+
+				std::cout << "80% accuracy:\n\t";
+				std::cout << (secondsTimeLeft / (numCards * 1.2f))
+				          << " seconds per card, "
+				          << std::min((numCards * 1.2f) / hoursTimeLeft,
+				                      static_cast<float>(numCards))
+				          << " cards per hour\n";
 			}
 			else
-			{
-				std::cerr << "Card has unrecognized fields\n";
-			}
-
-			// const rapidjson::Value& lemmaValue = currentCard["fields"]["Lemma"];
-			// assert(lemmaValue.IsObject());
-			// std::string lemmaString = resultValue[i]
-			//                               .GetObject()["fields"]
-			//                               .GetObject()["Lemma"]
-			//                               .GetObject()["value"]
-			//                               .GetString();
-
-			std::cout << "[" << i << "] " << currentCard["note"].GetInt64() << "\n"
-			          << "\tField order: " << fieldOrder << "\n"
-			          << "\tModel: " << currentCard["modelName"].GetString() << "\n"
-			          << "\tInterval: " << currentCard["interval"].GetInt64() << "\n"
-			          << "\tQuiz word: " << quizWord << "\n"
-			          << "\n\n";
+				std::cout << "Study time over";
 		}
 	}
 

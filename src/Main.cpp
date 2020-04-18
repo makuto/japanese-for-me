@@ -5,6 +5,7 @@
 #include <ctime>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 #include "curl/curl.h"
 #include "rapidjson/document.h"
@@ -179,6 +180,42 @@ void printObjectMembers(const rapidjson::Value& objectValue)
 	}
 }
 
+std::string getCardQuizWord(const RapidJsonObject& card)
+{
+	std::string quizWord = "";
+	int fieldOrder = card["fieldOrder"].GetInt();
+	assert(card["fields"].IsObject());
+	const rapidjson::Value& fieldsValue = card["fields"];
+	assert(fieldsValue.IsObject());
+	// Only "A Frequency Dictionary of Japanese Words" has this
+	if (fieldsValue.HasMember("Lemma"))
+	{
+		if (fieldOrder == 1)
+		{
+			// English -> Japanese
+			quizWord = fieldsValue["English Gloss"]["value"].GetString();
+		}
+		else
+		{
+			// Japanese -> English
+			quizWord = fieldsValue["Lemma"]["value"].GetString();
+		}
+	}
+	else if (fieldsValue.HasMember("Front"))
+	{
+		if (fieldOrder == 1)
+			quizWord = fieldsValue["Front"]["value"].GetString();
+		else
+			quizWord = fieldsValue["Back"]["value"].GetString();
+	}
+	else
+	{
+		std::cerr << "Card has unrecognized fields\n";
+	}
+
+	return quizWord;
+}
+
 void listDueCardsInfo(const rapidjson::Value& dueCardsInfo)
 {
 	assert(dueCardsInfo.IsArray());
@@ -189,35 +226,7 @@ void listDueCardsInfo(const rapidjson::Value& dueCardsInfo)
 		int fieldOrder = currentCard["fieldOrder"].GetInt();
 
 		// Get quiz word
-		assert(currentCard["fields"].IsObject());
-		const rapidjson::Value& fieldsValue = currentCard["fields"];
-		assert(fieldsValue.IsObject());
-		std::string quizWord = "";
-		// Only "A Frequency Dictionary of Japanese Words" has this
-		if (fieldsValue.HasMember("Lemma"))
-		{
-			if (fieldOrder == 1)
-			{
-				// English -> Japanese
-				quizWord = fieldsValue["English Gloss"]["value"].GetString();
-			}
-			else
-			{
-				// Japanese -> English
-				quizWord = fieldsValue["Lemma"]["value"].GetString();
-			}
-		}
-		else if (fieldsValue.HasMember("Front"))
-		{
-			if (fieldOrder == 1)
-				quizWord = fieldsValue["Front"]["value"].GetString();
-			else
-				quizWord = fieldsValue["Back"]["value"].GetString();
-		}
-		else
-		{
-			std::cerr << "Card has unrecognized fields\n";
-		}
+		std::string quizWord = getCardQuizWord(currentCard);
 
 		std::cout << "[" << i << "] " << currentCard["note"].GetInt64() << "\n"
 		          << "\tField order: " << fieldOrder << "\n"
@@ -246,19 +255,12 @@ int main()
 		getCardInfo(dueCards, dueCardIds["result"]);
 
 		assert(dueCards.HasMember("result"));
-		const rapidjson::Value& resultValue = dueCards["result"];
-		// listDueCardsInfo(resultValue);
+		const rapidjson::Value& dueCardsArray = dueCards["result"];
+		// listDueCardsInfo(dueCardsArray);
 
-		int numCards = static_cast<int>(resultValue.Size());
+		int numCards = static_cast<int>(dueCardsArray.Size());
 		if (numCards)
 		{
-			// programStartTime
-			// std::chrono::duration<float> availableStudyTime =
-			//     std::chrono::duration_cast<std::chrono::duration<float>>(endOfStudyDay -
-			//                                                               programStartTime);
-
-			// std::cout << availableStudyTime.count() << " seconds available to study\n";
-
 			// The time math is gonna be a bit loosey goosey here, but that's fine in our case
 			std::time_t currentTime;
 			std::tm* currentTimeInfo;
@@ -270,7 +272,7 @@ int main()
 			                      60.f;
 			float secondsTimeLeft = (hoursTimeLeft * 60.f * 60.f);
 
-			if (secondsTimeLeft)
+			if (secondsTimeLeft > 0.f)
 			{
 				std::cout << "Currently "
 				          << (currentTimeInfo->tm_hour > 12 ? currentTimeInfo->tm_hour - 12 :
@@ -285,14 +287,39 @@ int main()
 				          << " cards per hour\n\n";
 
 				std::cout << "80% accuracy:\n\t";
-				std::cout << (secondsTimeLeft / (numCards * 1.2f))
-				          << " seconds per card, "
+				std::cout << (secondsTimeLeft / (numCards * 1.2f)) << " seconds per card, "
 				          << std::min((numCards * 1.2f) / hoursTimeLeft,
 				                      static_cast<float>(numCards))
 				          << " cards per hour\n";
+
+				// Drip feed cards over the maximal time
+				for (int i = 0; i < std::min(5, numCards); ++i)
+				{
+					// Present card
+					const RapidJsonObject& currentCard = dueCardsArray[i].GetObject();
+					std::string quizWord = getCardQuizWord(currentCard);
+					std::cout << "[" << i + 1 << "/" << numCards << "]\n\t" << quizWord << "\n";
+
+					// Wait to present next card
+					std::chrono::steady_clock::time_point startTime =
+					    std::chrono::steady_clock::now();
+					// This won't be super accurate, but give or take a couple seconds even is fine
+					// in our case. Keep it positive so things don't get too wacky if weird math is
+					// above
+					float timeToNextCard = std::max(0.1f, secondsTimeLeft / (numCards * 1.2f));
+					std::this_thread::sleep_for(
+					    std::chrono::duration<float, std::ratio<1, 1>>(timeToNextCard));
+					std::chrono::steady_clock::time_point endTime =
+					    std::chrono::steady_clock::now();
+
+					std::chrono::duration<float> timeSlept =
+					    std::chrono::duration_cast<std::chrono::duration<float>>(endTime -
+					                                                             startTime);
+					std::cout << "\n\n" << timeSlept.count() << " seconds slept\n";
+				}
 			}
 			else
-				std::cout << "Study time over";
+				std::cout << "Study time over. " << numCards << " cards remaining.\n";
 		}
 	}
 

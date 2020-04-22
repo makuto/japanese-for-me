@@ -11,6 +11,8 @@
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 
+#include "Notifications.hpp"
+
 static const char* ankiConnectURL = "http://localhost:8765";
 
 // Assumptions made
@@ -19,9 +21,22 @@ static const char* ankiConnectURL = "http://localhost:8765";
 // - Advanced cards use field "Lemma" for the thing in the language you're learning and "English
 //   Gloss" for the first language field
 
+//
+// Study settings
+//
+
 // 7PM is when I want to be done studying to focus on winding down
 int hourStudyTimeEnds = 7 + 12;
 
+// I find I'm most happy with studying in 2-minute bursts. On average, I get about ten cards done.
+// This setting will determine how often I will be prompted to study in a burst of 10.
+int numCardsInStudyBlock = 10;
+// Never remind to study more than once every ten minutes (else, remind at optimal rate)
+float reasonableStudyIntervalSeconds = 60.f * 10.f;
+
+//
+// Curl configuration
+//
 CURL* curl_handle = nullptr;
 bool curlVerbose = false;
 bool curlRequestVerbose = false;
@@ -104,12 +119,20 @@ void listDecks()
 		std::cout << "[" << i << "] " << resultValue[i].GetString() << "\n";
 }
 
-void syncAnkiToAnkiWeb()
+bool syncAnkiToAnkiWeb()
 {
+	std::cout << "Synchronizing Collection..." << std::flush;
 	const char* jsonRequest = "{\"action\": \"sync\", \"version\": 6}";
 	std::string result = ankiConnectRequest(curl_handle, jsonRequest);
-	// if (result.empty())
-		// return;
+	std::cout << "done\n";
+
+	if (result.empty())
+	{
+		// Likely a failed connection
+		return false;
+	}
+
+	return true;
 }
 
 void getDueCards(rapidjson::Document& jsonResult)
@@ -250,16 +273,25 @@ int main()
 	std::cout << "Japanese For Me\nA vocabulary learning app by Macoy Madson.\n\n";
 
 	std::chrono::steady_clock::time_point programStartTime = std::chrono::steady_clock::now();
-	std::cout << "Syncing to AnkiWeb...";
 	
 	curl_global_init(CURL_GLOBAL_ALL);
 	curl_handle = curl_easy_init();
 
+	NotificationsHandler notifications;
+
 	// Make sure we are working with up-to-date data
-	syncAnkiToAnkiWeb();
-	std::cout << "done\n";
+	if (syncAnkiToAnkiWeb())
+		notifications.sendNotification("Collection synced");
+	else
+	{
+		notifications.sendNotification(
+		    "Failed to sync Collection. Please make sure Anki is running, and AnkiConnect is "
+		    "installed.");
+		return 1;
+	}
 
 	// listDecks();
+
 	rapidjson::Document dueCardIds;
 	getDueCards(dueCardIds);
 	if (dueCardIds.HasMember("result"))
@@ -274,6 +306,10 @@ int main()
 		int numCards = static_cast<int>(dueCardsArray.Size());
 		if (numCards)
 		{
+			std::ostringstream outStr;
+			outStr << numCards << " remaining";
+			notifications.sendNotification(outStr.str().c_str());
+
 			// The time math is gonna be a bit loosey goosey here, but that's fine in our case
 			std::time_t currentTime;
 			std::tm* currentTimeInfo;
@@ -305,8 +341,11 @@ int main()
 				                      static_cast<float>(numCards))
 				          << " cards per hour\n";
 
+				// TODO: Eventually this needs to update after syncing throughout the day
+				float timeToNextCard = std::max(0.1f, secondsTimeLeft / (numCards * 1.2f));
+
 				// Drip feed cards over the maximal time
-				for (int i = 0; i < std::min(5, numCards); ++i)
+				for (int i = 0; i < numCards; ++i)
 				{
 					// Present card
 					const RapidJsonObject& currentCard = dueCardsArray[i].GetObject();
@@ -314,25 +353,37 @@ int main()
 					std::cout << "[" << i + 1 << "/" << numCards << "]\n\t" << quizWord << "\n";
 
 					// Wait to present next card
-					std::chrono::steady_clock::time_point startTime =
-					    std::chrono::steady_clock::now();
-					// This won't be super accurate, but give or take a couple seconds even is fine
-					// in our case. Keep it positive so things don't get too wacky if weird math is
-					// above
-					float timeToNextCard = std::max(0.1f, secondsTimeLeft / (numCards * 1.2f));
-					std::this_thread::sleep_for(
-					    std::chrono::duration<float, std::ratio<1, 1>>(timeToNextCard));
-					std::chrono::steady_clock::time_point endTime =
-					    std::chrono::steady_clock::now();
+					{
+						std::chrono::steady_clock::time_point startTime =
+						    std::chrono::steady_clock::now();
+						// This won't be super accurate, but give or take a couple seconds even is
+						// fine in our case. Keep it positive so things don't get too wacky if weird
+						// math is above
+						std::this_thread::sleep_for(
+						    std::chrono::duration<float, std::ratio<1, 1>>(timeToNextCard));
+						std::chrono::steady_clock::time_point endTime =
+						    std::chrono::steady_clock::now();
 
-					std::chrono::duration<float> timeSlept =
-					    std::chrono::duration_cast<std::chrono::duration<float>>(endTime -
-					                                                             startTime);
-					std::cout << "\n\n" << timeSlept.count() << " seconds slept\n";
+						std::chrono::duration<float> timeSlept =
+						    std::chrono::duration_cast<std::chrono::duration<float>>(endTime -
+						                                                             startTime);
+						std::cout << "\n\n" << timeSlept.count() << " seconds slept\n";
+					}
+
+					// Trigger a notification to prompt studying
+					// Throttle notifications to not happen too often (this will occur if the
+					// learner is running out of time and has a lot of cards)
+					if (timeToNextCard * numCardsInStudyBlock > reasonableStudyIntervalSeconds &&
+					    i % numCardsInStudyBlock == 0)
+						notifications.sendNotification("Time to study!");
 				}
 			}
-			else
-				std::cout << "Study time over. " << numCards << " cards remaining.\n";
+		}
+		else
+		{
+			std::cout << "Study time over. " << numCards << " cards remaining.\n";
+
+			notifications.sendNotification("No more cards! Good work.");
 		}
 	}
 

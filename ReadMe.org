@@ -15,6 +15,12 @@ Jam is used to build Japanese for Me. You will need a C++ toolchain (clang or gc
 #+BEGIN_SRC sh
 sudo apt install jam
 #+END_SRC
+
+*** For system notifications
+Install LibNotify development headers:
+#+BEGIN_SRC sh
+sudo apt install libnotify-dev
+#+END_SRC
 ** Prepare Anki
 Anki is used to manage spaced repitition.
 
@@ -29,6 +35,11 @@ Build CURL:
 Build Japanese for Me:
 #+BEGIN_SRC sh
 ./Build_Debug.sh
+#+END_SRC
+
+If you want system-wide notifications, run this instead:
+#+BEGIN_SRC sh
+./Build_WithLibNotify_Debug.sh
 #+END_SRC
 * License
 The repository itself is under the MIT license.

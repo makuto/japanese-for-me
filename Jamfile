@@ -2,3 +2,10 @@ SubDir . ;
 
 Main japanese_for_me : src/Main.cpp
 ;
+
+LinkLibraries japanese_for_me : libJFMNotify ;
+
+Library libJFMNotify : $(NOTIFY_IMPLEMENTATION_FILES) ;
+# Library libJFMNotify : src/Notifications_Stub.cpp ;
+
+ObjectHdrs src/Notifications_LibNotify.cpp : $(NOTIFY_HEADERS) ;

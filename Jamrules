@@ -47,9 +47,32 @@ OPTIM = -O0 ;
 ## Linking
 ##
 
+if $(LIBNOTIFY_AVAILABLE)
+{
+  # From pkg-config --libs libnotify
+  NOTIFY_LINKLIBS = -lnotify -lgdk_pixbuf-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 ;
+  # From `pkg-config --cflags libnotify`
+  NOTIFY_HEADERS = /usr/include/gdk-pixbuf-2.0 /usr/include/libpng16
+  /usr/include/glib-2.0 /usr/lib/x86_64-linux-gnu/glib-2.0/include ;
+
+  NOTIFY_IMPLEMENTATION_FILES = src/Notifications_LibNotify.cpp ;
+}
+else
+{
+  NOTIFY_LINKLIBS =  ;
+  NOTIFY_HEADERS = ;
+  NOTIFY_IMPLEMENTATION_FILES = src/Notifications_Stub.cpp ;
+}
+
 LINKLIBS =
 # Standard (e.g. for Tracy)
 -lpthread -ldl
+
+$(NOTIFY_LINKLIBS)
+
+# curl
+-LDependencies/curl/local_install/lib
+-lcurl
 
 # SFML
 # -LDependencies/base2.0/dependencies/SFML/lib
@@ -62,10 +85,6 @@ LINKLIBS =
 
 # Base
 # -LDependencies/base2.0 -lBase20
-
-# curl
--LDependencies/curl/local_install/lib
--lcurl
 ;
 
 # LINKFLAGS = -Wl,-rpath,. ;

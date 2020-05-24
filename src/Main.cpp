@@ -25,29 +25,37 @@ static const char* ankiConnectURL = "http://localhost:8765";
 // Study settings
 //
 
-// 7PM is when I want to be done studying to focus on winding down
-int hourStudyTimeEnds = 7 + 12;
+// 7PM is when I want to be done studying to focus on winding down. The start time is when the
+// program is started
+static int hourStudyTimeEnds = 7 + 12;
 
 // I find I'm most happy with studying in 2-minute bursts. On average, I get about ten cards done.
 // This setting will determine how often I will be prompted to study in a burst of 10.
-int numCardsInStudyBlock = 10;
-// Never remind to study more than once every ten minutes (else, remind at optimal rate)
-float reasonableStudyIntervalSeconds = 60.f * 10.f;
+static int numCardsInStudyBlock = 10;
+// Never remind to study more than once every ten minutes (else, remind at optimal rate). This is
+// both for my study sanity and to reduce notification spam
+static float reasonableStudyIntervalSeconds = 60.f * 10.f;
+
+// With 100% accuracy, this number should be 1.f, because it means you only need time to do the
+// cards allocated at the start of the day. I tend to have an accuracy around 80%, so I adjust this
+// multiplier accordingly to estimate how many cards I will have to do, including misses.
+static float estimatedActualCardsMultiplier = 1.2f;
 
 //
 // Curl configuration
 //
-CURL* curl_handle = nullptr;
-bool curlVerbose = false;
-bool curlRequestVerbose = false;
-bool curlResponseStats = false;
-bool curlResponseVerbose = false;
+static bool curlVerbose = false;
+static bool curlRequestVerbose = false;
+static bool curlResponseStats = false;
+static bool curlResponseVerbose = false;
 
 // I hate auto, so I made this instead
 typedef rapidjson::GenericObject<
     true, rapidjson::GenericValue<rapidjson::UTF8<char>,
                                   rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator>>>
     RapidJsonObject;
+
+static CURL* curl_handle = nullptr;
 
 // Note that this can be called many times for a single request, if the packets are split
 static size_t CurlReceive(char* ptr, size_t size, size_t nmemb, void* userdata)
@@ -273,7 +281,7 @@ int main()
 	std::cout << "Japanese For Me\nA vocabulary learning app by Macoy Madson.\n\n";
 
 	std::chrono::steady_clock::time_point programStartTime = std::chrono::steady_clock::now();
-	
+
 	curl_global_init(CURL_GLOBAL_ALL);
 	curl_handle = curl_easy_init();
 
@@ -336,13 +344,19 @@ int main()
 				          << " cards per hour\n\n";
 
 				std::cout << "80% accuracy:\n\t";
-				std::cout << (secondsTimeLeft / (numCards * 1.2f)) << " seconds per card, "
-				          << std::min((numCards * 1.2f) / hoursTimeLeft,
+				std::cout << (secondsTimeLeft / (numCards * estimatedActualCardsMultiplier))
+				          << " seconds per card, "
+				          << std::min((numCards * estimatedActualCardsMultiplier) / hoursTimeLeft,
 				                      static_cast<float>(numCards))
 				          << " cards per hour\n";
 
+				// Use the 80% accuracy prediction to pace cards
 				// TODO: Eventually this needs to update after syncing throughout the day
-				float timeToNextCard = std::max(0.1f, secondsTimeLeft / (numCards * 1.2f));
+				// Probably just sync once around lunchtime, because the sync window pops up and is
+				// annoying. It doesn't have to be to-the-card accurate so long as the user is
+				// studying when they are prompted, and getting reasonable accuracy
+				float timeToNextCard =
+				    std::max(0.1f, secondsTimeLeft / (numCards * estimatedActualCardsMultiplier));
 
 				// Drip feed cards over the maximal time
 				for (int i = 0; i < numCards; ++i)
@@ -352,7 +366,22 @@ int main()
 					std::string quizWord = getCardQuizWord(currentCard);
 					std::cout << "[" << i + 1 << "/" << numCards << "]\n\t" << quizWord << "\n";
 
+					// Trigger a notification to prompt studying
+					// Throttle notifications to not happen too often (this will occur if the
+					// learner is running out of time and has a lot of cards)
+
+					// TODO: Make prompt for saying "Hey, you're in deep shit"
+					// TODO: If study time is almost over and there are stragglers, prompt session
+					// TODO: This is weird to notify in this numCards loop, because these are actual
+					// cards, and we want to notify based on estimated cards (num cards which would
+					// have passed assuming less than 100% accuracy)
+					if (timeToNextCard * numCardsInStudyBlock > reasonableStudyIntervalSeconds &&
+					    i % numCardsInStudyBlock == 0)
+						notifications.sendNotification("Time to study!");
+
 					// Wait to present next card
+					// Don't wait if this is the last card
+					if (i < numCards)
 					{
 						std::chrono::steady_clock::time_point startTime =
 						    std::chrono::steady_clock::now();
@@ -369,20 +398,13 @@ int main()
 						                                                             startTime);
 						std::cout << "\n\n" << timeSlept.count() << " seconds slept\n";
 					}
-
-					// Trigger a notification to prompt studying
-					// Throttle notifications to not happen too often (this will occur if the
-					// learner is running out of time and has a lot of cards)
-					if (timeToNextCard * numCardsInStudyBlock > reasonableStudyIntervalSeconds &&
-					    i % numCardsInStudyBlock == 0)
-						notifications.sendNotification("Time to study!");
 				}
+
+				std::cout << "Study time over. " << numCards << " cards remaining.\n";
 			}
 		}
 		else
 		{
-			std::cout << "Study time over. " << numCards << " cards remaining.\n";
-
 			notifications.sendNotification("No more cards! Good work.");
 		}
 	}

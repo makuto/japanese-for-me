@@ -21,7 +21,23 @@ Install LibNotify development headers:
 #+BEGIN_SRC sh
 sudo apt install libnotify-dev
 #+END_SRC
-** Prepare Anki
+** Download and prepare data
+*** Dictionary
+[[http://edrdg.org/jmdict/edict.html][Download EDICT2]] and extract to ~data/edict2~.
+Run the following command to convert EDICT2 to UTF-8:
+#+BEGIN_SRC sh
+iconv -f EUC-JP -t UTF-8 data/edict2 > data/utf8Edict2
+#+END_SRC
+TODO: Make this automatic via [[https://www.gnu.org/software/libiconv/][libiconv]].
+
+*** [[https://tatoeba.org/eng/downloads][Tatoeba downloads]] (not required)
+Download Japanese sentences, then English sentences, then links
+*Download all as Detailed* so that CC attribution can be upheld
+
+[[https://tatoeba.org/eng/terms_of_use#section-6][License]]
+** Prepare Anki 
+/(for Anki pacer only; not necessary for text analysis)/
+
 Anki is used to manage spaced repitition.
 
 - [[https://foosoft.net/projects/anki-connect/index.html#installation][Install AnkiConnect]]

@@ -3,7 +3,10 @@ SubDir . ;
 Main japanese_for_me : src/Main.cpp
 ;
 
-Main test_mecab : src/TextTest.cpp
+Main test_mecab_2 : src/TextTest.cpp
+;
+
+Main test_mecab : src/TextProcessor.cpp
 ;
 
 LinkLibraries japanese_for_me : libJFMNotify ;

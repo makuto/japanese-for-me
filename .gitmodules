@@ -7,3 +7,6 @@
 [submodule "Dependencies/mecab"]
 	path = Dependencies/mecab
 	url = https://github.com/taku910/mecab
+[submodule "Dependencies/parallel-hashmap"]
+	path = Dependencies/parallel-hashmap
+	url = https://github.com/greg7mdp/parallel-hashmap

@@ -27,7 +27,7 @@ Anki is used to manage spaced repitition.
 - [[https://foosoft.net/projects/anki-connect/index.html#installation][Install AnkiConnect]]
 - Run Anki
 ** Building
-Build CURL:
+Build CURL and Mecab:
 #+BEGIN_SRC sh
 ./BuildDependencies_Debug.sh
 #+END_SRC

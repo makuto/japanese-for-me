@@ -4,3 +4,6 @@
 [submodule "Dependencies/rapidjson"]
 	path = Dependencies/rapidjson
 	url = https://github.com/Tencent/rapidjson
+[submodule "Dependencies/mecab"]
+	path = Dependencies/mecab
+	url = https://github.com/taku910/mecab

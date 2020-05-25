@@ -29,6 +29,7 @@ HDRS = src
 # Dependencies/tracy
 Dependencies/curl/include
 Dependencies/rapidjson/include
+Dependencies/mecab/build/local/include
 ;
 
 # TODO: Make base hold all this weirdness?
@@ -59,7 +60,7 @@ if $(LIBNOTIFY_AVAILABLE)
 }
 else
 {
-  NOTIFY_LINKLIBS =  ;
+  NOTIFY_LINKLIBS = ;
   NOTIFY_HEADERS = ;
   NOTIFY_IMPLEMENTATION_FILES = src/Notifications_Stub.cpp ;
 }
@@ -73,6 +74,9 @@ $(NOTIFY_LINKLIBS)
 # curl
 -LDependencies/curl/local_install/lib
 -lcurl
+
+-LDependencies/mecab/build/local/lib
+-lmecab
 
 # SFML
 # -LDependencies/base2.0/dependencies/SFML/lib
@@ -91,7 +95,7 @@ $(NOTIFY_LINKLIBS)
 
 # TODO: Copy libs to better directory, or static link?
 LINKFLAGS = -g
--Wl,-rpath,.:Dependencies/curl/local_install/lib ;
+-Wl,-rpath,.:Dependencies/curl/local_install/lib:Dependencies/mecab/build/local/lib ;
 
 ##
 ## Jam stuff

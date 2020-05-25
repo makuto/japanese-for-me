@@ -3,6 +3,9 @@ SubDir . ;
 Main japanese_for_me : src/Main.cpp
 ;
 
+Main test_mecab : src/TextTest.cpp
+;
+
 LinkLibraries japanese_for_me : libJFMNotify ;
 
 Library libJFMNotify : $(NOTIFY_IMPLEMENTATION_FILES) ;

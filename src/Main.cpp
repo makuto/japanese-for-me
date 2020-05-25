@@ -280,7 +280,7 @@ int main()
 {
 	std::cout << "Japanese For Me\nA vocabulary learning app by Macoy Madson.\n\n";
 
-	std::chrono::steady_clock::time_point programStartTime = std::chrono::steady_clock::now();
+	// std::chrono::steady_clock::time_point programStartTime = std::chrono::steady_clock::now();
 
 	curl_global_init(CURL_GLOBAL_ALL);
 	curl_handle = curl_easy_init();

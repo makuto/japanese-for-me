@@ -30,6 +30,7 @@ HDRS = src
 Dependencies/curl/include
 Dependencies/rapidjson/include
 Dependencies/mecab/build/local/include
+Dependencies/parallel-hashmap/parallel_hashmap
 ;
 
 # TODO: Make base hold all this weirdness?

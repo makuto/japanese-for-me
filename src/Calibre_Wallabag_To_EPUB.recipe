@@ -15,15 +15,45 @@ from lxml.html.builder import HTML, HEAD, TITLE, STYLE, DIV, BODY, \
         TABLE, TD, TR
 from calibre import strftime, isbytestring
 
+import datetime
+import os
+
+# Store when the script was last run to filter out older articles
+lastTimeRunFileName = os.path.expanduser("~") + "/CalibreEpub_LastExportDate.txt"
+dateFormat = "%Y-%m-%d"
+
+def DetermineOldestArticle():
+    lastTimeRun = None
+    if os.path.isfile(lastTimeRunFileName):
+        lastTimeRunFile = open(lastTimeRunFileName, 'r')
+        lastTimeRunFileLines  = lastTimeRunFile.readlines()
+        lastTimeRunFile.close()
+
+        lastTimeRun = datetime.datetime.strptime(lastTimeRunFileLines[0].strip(), dateFormat)
+
+    currentTime = datetime.datetime.now()
+    lastTimeRunFile = open(lastTimeRunFileName, 'w')
+    lastTimeRunFile.write(currentTime.strftime(dateFormat))
+    lastTimeRunFile.close()
+
+    if lastTimeRun:
+        numDaysSinceLastRun = (currentTime - lastTimeRun).days
+        print("{} days since articles were last pulled; only pulling articles added after that time"
+              .format(numDaysSinceLastRun))
+        # If it's a same-day execution, they probably saved new articles they now want. Let it run
+        return numDaysSinceLastRun if numDaysSinceLastRun > 0 else 1
+    else:
+        return 365
+
 class AdvancedUserRecipe1592324084(BasicNewsRecipe):
     title          = 'Wallabag Japanese {}'.format(time.strftime("%Y-%m-%d %H:%M"))
-    oldest_article = 365
+    oldest_article = DetermineOldestArticle()
     max_articles_per_feed = 100
     auto_cleanup   = True
 
     feeds          = [
         # Example: ('Wallabag', 'https://app.wallabag.it/feed/Macoy/MySecretToken/unread'),
-        ('Wallabag', 'https://app.wallabag.it/feed/You/YourToken/unread'),
+        ('Wallabag', 'https://app.wallabag.it/feed/YourName/MySecretToken/unread'),
     ]
 
     def parse_feeds(self):
@@ -33,9 +63,6 @@ class AdvancedUserRecipe1592324084(BasicNewsRecipe):
         # Further filtering
         for feed in feeds:
             for article in feed.articles[:]:
-                # if not "えんぴつの家出" in article.title:
-                    # feed.articles.remove(article)
-                    # continue
                 foundJapanese = False
                 for char in article.title:
                     # While I could use <category> from Wallabag, I can't be assed

@@ -58,7 +58,7 @@ If you want system-wide notifications, run this instead:
 ./Build_WithLibNotify_Debug.sh
 #+END_SRC
 ** Using the Calibre Wallabag download script
-This script automatically detects Japanese articles based on whether there are any CJK characters in the article title. It then collates them into an .epub for offline reading. Wallabag is used for article gathering and Calibre is used for conversion.
+This script automatically detects Japanese articles based on whether there are any CJK characters in the article title. It then collates them into an .epub for offline reading (thanks to [[https://blog.b-ark.ca/2020/04/22/diy-kindle-news.html][this article]] for the idea). Wallabag is used for article gathering and Calibre is used for conversion.
 
 - Install Calibre (~sudo apt install calibre~ on Linux, on Windows make sure you install and add it to your path)
 - Open your [[https://app.wallabag.it/][Wallabag account]] 

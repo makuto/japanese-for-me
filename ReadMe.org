@@ -68,6 +68,28 @@ This script automatically detects Japanese articles based on whether there are a
 - Paste the token string into ~src/Calibre_Wallabag_To_EPUB.recipe~ at the URL line, along with your username
 - Run the corresponding ~DownloadCalibreArticles*.sh~ script to create a .epub in the same directory with your articles
 - Read that with an EPUB reader, e.g. [[https://github.com/makuto/typhon][Typhon]], with good Japanese dictionary support
+** Using the Video to EPUB script
+This script is somewhat ridiculous. It takes a video and .vtt subtitles file and converts it to an .epub file with images for each subtitle. This makes it possible to "read" a TV episode on an E-Ink tablet, for example.
+
+I made this because I'm not good enough at listening to Japanese at full speed. Now, I can "read the episode" first, then watch it later.
+
+The full pipeline requires both ~ffmpeg~ and ~pandoc~:
+
+#+BEGIN_SRC sh
+sudo apt install ffmpeg pandoc
+#+END_SRC
+
+And here's how to run it:
+
+#+BEGIN_SRC sh
+# Run the script
+python3 VideoToEPUB.py MyVideo.mp4 MyVideo.ja.vtt output/
+# Convert to EPUB
+pandoc -f org -t epub output/MyVid.org -o ~/Documents/MyVid.epub
+#+END_SRC
+
+Note that this should work for any language, so long as the subtitles file is ~.vtt~ format. Any video format supported by ffmpeg should work.
+
 * License
 The repository itself is under the MIT license.
 
